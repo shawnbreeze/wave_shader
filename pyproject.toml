@@ -1,0 +1,11 @@
+[project]
+name = "shader"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.2.5",
+    "pillow>=11.2.1",
+    "pyside6>=6.9",
+    "scipy>=1.15.2",
+]
