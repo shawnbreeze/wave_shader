@@ -69,13 +69,14 @@ ApplicationWindow {
     // Update visiblePortion when scaleFactor changes
     onScaleFactorChanged: {
         visiblePortion = Math.min(1.0, 1.0 / scaleFactor)
+        // Ensure startPosition is adjusted correctly after zoom
+        var maxPosition = Math.max(0.0, 1.0 - visiblePortion)
         if (zooming) {
             // When zoom animation is active, adjust startPosition so anchorCursorPos remains under anchorMouseX
             startPosition = Math.max(0.0,
-                            Math.min(1.0 - visiblePortion,
+                            Math.min(maxPosition, // Use maxPosition here
                                      anchorCursorPos - anchorMouseX * visiblePortion))
         } else {
-            var maxPosition = Math.max(0.0, 1.0 - visiblePortion)
             if (startPosition > maxPosition) {
                 startPosition = maxPosition
             }
@@ -94,12 +95,48 @@ ApplicationWindow {
 
         Row {
             anchors.fill: parent
-            spacing: 10
+            anchors.leftMargin: 5 // Added left margin
+            anchors.rightMargin: 5 // Added right margin
+            spacing: 5 // Adjusted spacing
+
+            // Scroll Left Button
+            Button {
+                id: scrollLeftButton
+                width: 27 // Adjusted width (40 / 1.5)
+                height: parent.height
+                text: "◀" // Changed icon
+                font.pixelSize: 18 // Adjusted font size for new icon and width
+                onClicked: {
+                    if (scrollAnimation.running) {
+                        scrollAnimation.stop()
+                    }
+                    // Scroll amount is one visible portion to the left
+                    var scrollAmount = root.visiblePortion; 
+                    var newPos = Math.max(0.0, root.startPosition - scrollAmount);
+                    
+                    scrollAnimation.from = root.startPosition;
+                    scrollAnimation.to = newPos;
+                    scrollAnimation.start();
+                }
+                background: Rectangle {
+                    color: scrollLeftButton.pressed ? "#505050" : "#303030"
+                    radius: 3
+                    border.color: "#404040"
+                    border.width: 1
+                }
+                contentItem: Text {
+                    text: scrollLeftButton.text
+                    font: scrollLeftButton.font
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
 
             // Main scrollbar for navigation
             Item {
                 id: scrollBarContainer
-                width: parent.width
+                width: parent.width - scrollLeftButton.width - scrollRightButton.width - parent.spacing * 2 // Adjust width
                 height: parent.height
                 clip: true // Clip contents beyond borders
 
@@ -134,8 +171,6 @@ ApplicationWindow {
                         property vector4d  backColor: Qt.vector4d(0, 0, 0, 0)
                         property real      startTime: 0.0
                         property int       sampleRate: root.sampleRateValue
-                        // Удаляем дублирующееся свойство, оно определено ниже
-                        // property real      scaleFactor: 1.0
                         property int       samplePerPixel: root.spx
                         property variant sourceFine: fineTexture
                         property variant sourceCoarse: coarseTexture
@@ -144,8 +179,6 @@ ApplicationWindow {
                         property int sppFine: root.spxFine
                         property int sppCoarse: root.spxCoarse
                         property real scaleFactor: 1.0
-//                        fragmentShader: "shaders/waveform_t.frag.qsb"
-//                        vertexShader:   "shaders/waveform_t.vert.qsb"
                         fragmentShader: "shaders/new_wave.frag.qsb"
                         vertexShader:   "shaders/new_wave.vert.qsb"
                     }
@@ -174,7 +207,7 @@ ApplicationWindow {
                         // Base handle color (opaque)
                         color: "#A0A0A0" 
                         // Initial opacity
-                        opacity: navigationScrollBar.hovered ? 0.5 : 0.3
+                        opacity: navigationScrollBar.hovered ? 0.6 : 0.3
 
                         // Animation for opacity property
                         Behavior on opacity {
@@ -233,6 +266,41 @@ ApplicationWindow {
                     }
                 }
             }
+
+            // Scroll Right Button
+            Button {
+                id: scrollRightButton
+                width: 27 // Adjusted width (40 / 1.5)
+                height: parent.height
+                text: "▶" // Changed icon
+                font.pixelSize: 18 // Adjusted font size for new icon and width
+                onClicked: {
+                    if (scrollAnimation.running) {
+                        scrollAnimation.stop()
+                    }
+                    // Scroll amount is one visible portion to the right
+                    var scrollAmount = root.visiblePortion; 
+                    var maxPos = Math.max(0.0, 1.0 - root.visiblePortion); // Max possible startPosition
+                    var newPos = Math.min(maxPos, root.startPosition + scrollAmount);
+
+                    scrollAnimation.from = root.startPosition;
+                    scrollAnimation.to = newPos;
+                    scrollAnimation.start();
+                }
+                background: Rectangle {
+                    color: scrollRightButton.pressed ? "#505050" : "#303030"
+                    radius: 3
+                    border.color: "#404040"
+                    border.width: 1
+                }
+                contentItem: Text {
+                    text: scrollRightButton.text
+                    font: scrollRightButton.font
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
             // Removed element for current position display (timeDisplay)
         }
     }
@@ -263,7 +331,7 @@ ApplicationWindow {
         id: scrollAnimation
         target: root
         property: "startPosition"
-        duration: 500
+        duration: 250
         easing.type: Easing.OutCubic
     }
 
@@ -331,7 +399,7 @@ ApplicationWindow {
 
     ShaderEffect {
         id: waveShader
-//        antialiasing: true
+        antialiasing: true
         layer.enabled: true
         layer.samples: 8
         smooth: true
@@ -345,12 +413,12 @@ ApplicationWindow {
         property vector2d resolution: Qt.vector2d(width, height)
         property int texWidth: waveImg.width
         property var ampScale: 0.23
-        property var smoothing: 9999
+        property real smoothing: 1.5
         property vector4d waveColor: Qt.vector4d(0.28,0.85,0.59,1.0)
         property vector4d backColor: Qt.vector4d(0.0,0.0,0.0,1.0)
         property real startTime: root.viewStartTime
         property int sampleRate: root.sampleRateValue
-        // Удаляем дублирующееся свойство, оно определено ниже
+        // Удаляем дублиру��щееся свойство, оно определено ниже
         // property real scaleFactor: root.scaleFactor
         property int samplePerPixel: root.spx
         property variant sourceFine: fineTexture
@@ -421,7 +489,7 @@ ApplicationWindow {
                   Math.floor(root.viewStartTime * root.sampleRateValue) + " | Texture index: " + 
                   Math.floor(root.viewStartTime * root.sampleRateValue / 
                   (root.scaleFactor > 50 ? root.spxFine : root.spxCoarse)) + " | Scale: ×" + 
-                  root.scaleFactor.toFixed(1) + " | Текущая текстура: " + root.activeTexture;
+                  root.scaleFactor.toFixed(1) + " | Текстура: " + root.activeTexture;
             font.pixelSize: 15
         }
     }

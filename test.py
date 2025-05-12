@@ -138,7 +138,7 @@ class AudioWaveApp:
         self.wave_provider = WaveImageProvider()
         self.engine.addImageProvider("wave", self.wave_provider)
 
-        audio_file_path = "bb.wav"
+        audio_file_path = "aa.wav"
         
         # Retrieve audio file info before creating texture
         with wave.open(audio_file_path, 'rb') as wav_file:
@@ -229,8 +229,7 @@ if __name__ == "__main__":
     import os
     os.environ['QSG_RENDER_LOOP'] = 'basic'  # Use basic render loop for debugging
 
-    # Set environment variables for Vulkan
-    os.environ["QT_QUICK_BACKEND"] = "vulkan"  # или "vulkan"
+    # Set environment variables
     # os.environ["QSG_INFO"] = "1"
     QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Vulkan)  # или .OpenGL, .Direct3D11 …
 
