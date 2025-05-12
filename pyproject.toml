@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
+    "nuitka>=2.7.2",
     "numpy>=2.2.5",
     "pillow>=11.2.1",
     "pyside6>=6.9",

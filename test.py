@@ -8,8 +8,27 @@ from PySide6.QtQuickControls2 import QQuickStyle
 import wave
 import math
 from numpy import ceil
+import logging  # Добавляем импорт logging
 
 from audio_processing import audio_to_qimage
+
+# Настройка логгера
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования DEBUG для захвата всех сообщений
+
+# Обработчик для записи в файл
+file_handler = logging.FileHandler('logfile.log', mode='w')  # 'w' для перезаписи файла при каждом запуске
+file_handler.setLevel(logging.DEBUG)
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Обработчик для вывода в консоль
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)  # В консоль можно выводить, например, только INFO и выше
+console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
 
 
 class WaveImageProvider(QQuickImageProvider):
@@ -21,24 +40,25 @@ class WaveImageProvider(QQuickImageProvider):
         self.provider_id = f"WaveProvider-{id(self)}"
         import time
         self.creation_time = time.strftime("%H:%M:%S")
+        logger.info(f"WaveImageProvider {self.provider_id} created at {self.creation_time}")
         
     def set_image(self, key, image):
         self.images[key] = image
-        print(f"Set image '{key}': {image.width()}x{image.height()}, format: {image.format()}, isNull: {image.isNull()}")
+        logger.info(f"Set image '{key}': {image.width()}x{image.height()}, format: {image.format()}, isNull: {image.isNull()}")
         if image.isNull():
-            print("WARNING: Null image set in provider!")
+            logger.warning("WARNING: Null image set in provider!")
         
     def requestImage(self, id, size, requested_size):
         self.request_count += 1
         key = id.split('/')[0] if '/' in id else id
         if key not in self.images or self.images[key].isNull():
-            print(f"Warning: Image provider returning empty image for id: {id}")
+            logger.warning(f"Image provider returning empty image for id: {id}")
             empty_img = QImage(16, 16, QImage.Format.Format_RGBA8888)
             empty_img.fill(QColor(255, 0, 0, 255))
             return empty_img
             
         img_size = QSize(self.images[key].width(), self.images[key].height())
-        print(f"Returning image #{self.request_count}: {img_size.width()}x{img_size.height()} for id: {id}")
+        logger.debug(f"Returning image #{self.request_count}: {img_size.width()}x{img_size.height()} for id: {id}")
         
         result_image = QImage(self.images[key])
 
@@ -52,7 +72,8 @@ class WaveImageProvider(QQuickImageProvider):
         return {
             "provider_id": self.provider_id,
             "creation_time": self.creation_time,
-            "request_count": self.request_count
+            "request_count": self.request_count,
+            "image_keys": list(self.images.keys())
         }
 
 
@@ -115,7 +136,7 @@ def calculate_optimal_sample_per_pixel(num_frames, sample_rate, screen_width, mi
     if num_frames / result < target_width / 2:
         result = max(1, num_frames // target_width)
     
-    print(f"Base SPP value: {raw_spp:.2f}, power of two: {power_of_two}, final: {result}")
+    logger.info(f"Base SPP value: {raw_spp:.2f}, power of two: {power_of_two}, final: {result}")
     
     return result
 
@@ -127,6 +148,7 @@ class AudioWaveApp:
         # Set base style for all controls
         QQuickStyle.setStyle("Material")
         
+        logger.info("Application started.")
         self.engine = QQmlApplicationEngine()
         frmt = QSurfaceFormat()
         frmt.setSamples(8)
@@ -138,7 +160,7 @@ class AudioWaveApp:
         self.wave_provider = WaveImageProvider()
         self.engine.addImageProvider("wave", self.wave_provider)
 
-        audio_file_path = "aa.wav"
+        audio_file_path = "Antonio Vivaldi - Allegro - Spring.wav"
         
         # Retrieve audio file info before creating texture
         with wave.open(audio_file_path, 'rb') as wav_file:
@@ -151,18 +173,26 @@ class AudioWaveApp:
         screen = app.primaryScreen()
         screen_width = screen.size().width()
         
-        # init sample_per_pixel
+        # init sample_per_pixel (SPP), 1 for max detailed view, lower values need more GPU
         sample_per_pixel = 1
         
         # create 2 textures with different sample_per_pixel values
         # fine texture
         fine_texture = audio_to_qimage(audio_file_path, sample_per_pixel)
+        if fine_texture.isNull():
+            logger.error(f"Failed to load fine texture for {audio_file_path}")
+        else:
+            logger.info(f"Fine texture loaded: {fine_texture.width()}x{fine_texture.height()}")
         fine_texture_copy = QImage(fine_texture)
         self.wave_provider.set_image("fine", fine_texture_copy)
         
         # coarse texture
         coarse_sample_per_pixel = sample_per_pixel * 16
         coarse_texture = audio_to_qimage(audio_file_path, coarse_sample_per_pixel)
+        if coarse_texture.isNull():
+            logger.error(f"Failed to load coarse texture for {audio_file_path}")
+        else:
+            logger.info(f"Coarse texture loaded: {coarse_texture.width()}x{coarse_texture.height()}")
         coarse_texture_copy = QImage(coarse_texture)
         self.wave_provider.set_image("coarse", coarse_texture_copy)
         
@@ -209,9 +239,9 @@ class AudioWaveApp:
         
         try:
             subprocess.run(['compile_shaders.bat'], shell=True, check=True)
-            # print("Shaders compiled successfully")
-        except subprocess.CalledProcessError:
-            print("Error compiling shaders")
+            logger.info("Shaders compiled successfully")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error compiling shaders: {e}")
             
         # Load QML
         self.engine.addImportPath(":/")
@@ -219,8 +249,10 @@ class AudioWaveApp:
 
         # Check QML load success
         if not self.engine.rootObjects():
-            print("Error loading QML file")
+            logger.error("Error loading QML file. Root objects not found.")
             sys.exit(-1)
+        else:
+            logger.info("QML file loaded successfully.")
             
         sys.exit(app.exec())
 
@@ -228,9 +260,16 @@ class AudioWaveApp:
 if __name__ == "__main__":
     import os
     os.environ['QSG_RENDER_LOOP'] = 'basic'  # Use basic render loop for debugging
+    logger.info(f"QSG_RENDER_LOOP set to: {os.environ.get('QSG_RENDER_LOOP')}")
 
     # Set environment variables
     # os.environ["QSG_INFO"] = "1"
-    QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Vulkan)  # или .OpenGL, .Direct3D11 …
+    # logger.info(f"QSG_INFO set to: {os.environ.get('QSG_INFO')}")
+    
+    # Устанавливаем API графики
+    # QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.OpenGL)
+    QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Vulkan)
+    logger.info(f"Graphics API set to: {QQuickWindow.graphicsApi()}")
+
 
     app = AudioWaveApp()

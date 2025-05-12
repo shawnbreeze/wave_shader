@@ -2,6 +2,7 @@ from pprint import pprint
 import numpy as np
 from PySide6.QtGui import QImage, QColor
 import wave
+import logging
 
 
 MAX_TEX_SIDE = 8192           # maximum texture width/height
@@ -87,7 +88,7 @@ def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> QImage:
 
     # Check if the QImage was created successfully
     if qimg.isNull():
-        print("ERROR: Failed to create QImage from array data! Returning fallback image.")
+        logging.error("ERROR: Failed to create QImage from array data! Returning fallback image.")
         # Return a fallback image
         fallback = QImage(MAX_TEX_SIDE, MAX_TEX_SIDE, QImage.Format.Format_RGBA32FPx4_Premultiplied)
         fallback.fill(QColor(255, 0, 0))
@@ -96,7 +97,7 @@ def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> QImage:
     # 4. Create a copy of the QImage
     qimg = QImage(qimg)
 
-    print(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}, colorSpace: {qimg.colorSpace()}")
+    print(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}")
     #qimg.save("w.png", "PNG", 100)  # debug save to file
     return qimg
 

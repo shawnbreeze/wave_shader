@@ -152,7 +152,7 @@ ApplicationWindow {
                 Item {
                     id: miniWaveLayer
                     anchors.fill: parent
-                    opacity: 0.5          // Overall opacity for the thumbnail
+                    opacity: 0.75          // Overall opacity for the thumbnail
                     z: 1                   // Positioned above background, below ScrollBar
                     layer.enabled: true    // Enable layer for correct alpha
 
@@ -414,7 +414,7 @@ ApplicationWindow {
         property int texWidth: waveImg.width
         property var ampScale: 0.23
         property real smoothing: 1.5
-        property vector4d waveColor: Qt.vector4d(0.28,0.85,0.59,1.0)
+        property vector4d waveColor: Qt.vector4d(0.18,0.85,0.59,1.0)
         property vector4d backColor: Qt.vector4d(0.0,0.0,0.0,1.0)
         property real startTime: root.viewStartTime
         property int sampleRate: root.sampleRateValue
@@ -485,11 +485,12 @@ ApplicationWindow {
             anchors.bottom: parent.bottom
             anchors.margins: 10
             color: "white"
-            text: "Position: " + root.viewStartTime.toFixed(2) + " sec | Sample index: " + 
-                  Math.floor(root.viewStartTime * root.sampleRateValue) + " | Texture index: " + 
-                  Math.floor(root.viewStartTime * root.sampleRateValue / 
-                  (root.scaleFactor > 50 ? root.spxFine : root.spxCoarse)) + " | Scale: ×" + 
-                  root.scaleFactor.toFixed(1) + " | Текстура: " + root.activeTexture;
+            text: "Position: " + root.viewStartTime.toFixed(2) +
+            " sec | Sample index: " + Math.floor(root.viewStartTime * root.sampleRateValue) +
+            " | Texture index: " + Math.floor(root.viewStartTime * root.sampleRateValue / (root.scaleFactor > 50 ? root.spxFine : root.spxCoarse)) +
+            " | Zoom: ×" + root.scaleFactor.toFixed(1) +
+            " | SPP: " + spxFine +
+            " | Текстура: " + root.activeTexture;
             font.pixelSize: 15
         }
     }
