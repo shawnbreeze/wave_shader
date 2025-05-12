@@ -36,6 +36,13 @@ ApplicationWindow {
     property real anchorMouseX: 0.0       // Normalized X-coordinate of the mouse (0-1) at zoom start
     property real anchorCursorPos: 0.0    // Audio position to remain under the cursor
 
+    // Добавляем свойства для обеих текстур
+    property int spxFine: fineSamplePerPixel
+    property int spxCoarse: coarseSamplePerPixel
+    property int colsUsedFine: fineColsUsed
+    property int colsUsedCoarse: coarseColsUsed
+    property string activeTexture: (scaleFactor > 50) ? "Детальная" : "Грубая"
+
     function formatTime(seconds) {
         var mins = Math.floor(seconds / 60)
         var secs = Math.floor(seconds % 60)
@@ -127,8 +134,16 @@ ApplicationWindow {
                         property vector4d  backColor: Qt.vector4d(0, 0, 0, 0)
                         property real      startTime: 0.0
                         property int       sampleRate: root.sampleRateValue
-                        property real      scaleFactor: 1.0
+                        // Удаляем дублирующееся свойство, оно определено ниже
+                        // property real      scaleFactor: 1.0
                         property int       samplePerPixel: root.spx
+                        property variant sourceFine: fineTexture
+                        property variant sourceCoarse: coarseTexture
+                        property int colsUsedFine: root.colsUsedFine
+                        property int colsUsedCoarse: root.colsUsedCoarse
+                        property int sppFine: root.spxFine
+                        property int sppCoarse: root.spxCoarse
+                        property real scaleFactor: 1.0
 //                        fragmentShader: "shaders/waveform_t.frag.qsb"
 //                        vertexShader:   "shaders/waveform_t.vert.qsb"
                         fragmentShader: "shaders/new_wave.frag.qsb"
@@ -260,7 +275,7 @@ ApplicationWindow {
         layer.smooth: false
         smooth: false
         mipmap: false
-        cache: false  // Отключаем кэширование, чтобы принудительно перезагружать
+        cache: true  // Отключаем кэширование, чтобы принудительно перезагружать
         asynchronous: true // Асинхронная загрузка для больших изображений
         
         // Обработка ошибок загрузки
@@ -271,6 +286,45 @@ ApplicationWindow {
                 console.log("Image loading...")
             } else if (status === Image.Error) {
                 console.error("Error loading image: " + source)
+            }
+        }
+    }
+
+    // Загружаем обе текстуры
+    Image {
+        id: fineTexture
+        source: fineTextureUrl
+        visible: false
+        layer.smooth: false
+        smooth: false
+        mipmap: false
+        cache: true
+        asynchronous: true
+        
+        onStatusChanged: {
+            if (status === Image.Ready) {
+                console.log("Fine texture loaded: " + width + "x" + height)
+            } else if (status === Image.Error) {
+                console.error("Error loading fine texture")
+            }
+        }
+    }
+    
+    Image {
+        id: coarseTexture
+        source: coarseTextureUrl
+        visible: false
+        layer.smooth: false
+        smooth: false
+        mipmap: false
+        cache: true
+        asynchronous: true
+        
+        onStatusChanged: {
+            if (status === Image.Ready) {
+                console.log("Coarse texture loaded: " + width + "x" + height)
+            } else if (status === Image.Error) {
+                console.error("Error loading coarse texture")
             }
         }
     }
@@ -296,8 +350,16 @@ ApplicationWindow {
         property vector4d backColor: Qt.vector4d(0.0,0.0,0.0,1.0)
         property real startTime: root.viewStartTime
         property int sampleRate: root.sampleRateValue
-        property real scaleFactor: root.scaleFactor
+        // Удаляем дублирующееся свойство, оно определено ниже
+        // property real scaleFactor: root.scaleFactor
         property int samplePerPixel: root.spx
+        property variant sourceFine: fineTexture
+        property variant sourceCoarse: coarseTexture
+        property int colsUsedFine: root.colsUsedFine
+        property int colsUsedCoarse: root.colsUsedCoarse
+        property int sppFine: root.spxFine
+        property int sppCoarse: root.spxCoarse
+        property real scaleFactor: root.scaleFactor
 //        fragmentShader: "shaders/waveform_t.frag.qsb"
 //        vertexShader: "shaders/waveform_t.vert.qsb"
         fragmentShader: "shaders/new_wave.frag.qsb"
@@ -357,9 +419,10 @@ ApplicationWindow {
             color: "white"
             text: "Position: " + root.viewStartTime.toFixed(2) + " sec | Sample index: " + 
                   Math.floor(root.viewStartTime * root.sampleRateValue) + " | Texture index: " + 
-                  Math.floor(root.viewStartTime * root.sampleRateValue / root.spx) + " | Scale: ×" + 
-                  root.scaleFactor.toFixed(1) + " | SPP: " + root.spx
-            font.pixelSize: 12
+                  Math.floor(root.viewStartTime * root.sampleRateValue / 
+                  (root.scaleFactor > 50 ? root.spxFine : root.spxCoarse)) + " | Scale: ×" + 
+                  root.scaleFactor.toFixed(1) + " | Текущая текстура: " + root.activeTexture;
+            font.pixelSize: 15
         }
     }
 
@@ -425,7 +488,7 @@ ApplicationWindow {
         // Второй Image элемент с тем же URL
         Image {
             id: debugImage
-            source: waveTextureUrl  // Тот же URL, что и основное изображение
+            source: (root.scaleFactor > 50) ? fineTextureUrl : coarseTextureUrl
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width - 10
@@ -445,3 +508,4 @@ ApplicationWindow {
         }
     }
 }
+

@@ -1,10 +1,10 @@
 import sys
-from PySide6.QtCore import Qt, QUrl, QSize  # Добавлен импорт QSize
+from PySide6.QtCore import Qt, QUrl, QSize
 from PySide6.QtGui import QImage, QColor, QSurfaceFormat
 from PySide6.QtQml import QQmlApplicationEngine, QQmlImageProviderBase
 from PySide6.QtQuick import QQuickImageProvider, QQuickWindow, QSGRendererInterface
 from PySide6.QtWidgets import QApplication
-from PySide6.QtQuickControls2 import QQuickStyle  # Set base style for controls
+from PySide6.QtQuickControls2 import QQuickStyle
 import wave
 import math
 from numpy import ceil
@@ -14,45 +14,37 @@ from audio_processing import audio_to_qimage
 
 class WaveImageProvider(QQuickImageProvider):
     def __init__(self):
-        # Используем Image вместо ImageType.Image
         super().__init__(QQmlImageProviderBase.Image, 
                          QQmlImageProviderBase.ForceAsynchronousImageLoading)
-        self.image = None
+        self.images = {}  # Словарь для хранения нескольких текстур
         self.request_count = 0
-        self.provider_id = f"WaveProvider-{id(self)}"  # Уникальный ID провайдера
+        self.provider_id = f"WaveProvider-{id(self)}"
         import time
         self.creation_time = time.strftime("%H:%M:%S")
         
-    def set_image(self, image):
-        self.image = image
-        print(f"Set image: {image.width()}x{image.height()}, format: {image.format()}, isNull: {image.isNull()}")
-        # Убедимся, что изображение действительно доступно
+    def set_image(self, key, image):
+        self.images[key] = image
+        print(f"Set image '{key}': {image.width()}x{image.height()}, format: {image.format()}, isNull: {image.isNull()}")
         if image.isNull():
             print("WARNING: Null image set in provider!")
         
     def requestImage(self, id, size, requested_size):
         self.request_count += 1
-        if self.image is None or self.image.isNull():
-            # Возвращаем пустое изображение если ничего не установлено
+        key = id.split('/')[0] if '/' in id else id
+        if key not in self.images or self.images[key].isNull():
             print(f"Warning: Image provider returning empty image for id: {id}")
             empty_img = QImage(16, 16, QImage.Format.Format_RGBA8888)
-            empty_img.fill(QColor(255, 0, 0, 255))  # Непрозрачный красный для диагностики
-            
-            # Возвращаем только изображение, не кортеж
+            empty_img.fill(QColor(255, 0, 0, 255))
             return empty_img
             
-        # Выводим информацию о размере для отладки
-        img_size = QSize(self.image.width(), self.image.height())
+        img_size = QSize(self.images[key].width(), self.images[key].height())
         print(f"Returning image #{self.request_count}: {img_size.width()}x{img_size.height()} for id: {id}")
         
-        # Создаем копию изображения для модификации
-        result_image = QImage(self.image)
+        result_image = QImage(self.images[key])
 
-        # Устанавливаем размер запрашиваемого изображения, если он задан
         if requested_size.width() > 0 and requested_size.height() > 0:
             return result_image.scaled(requested_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         else:
-            # Возвращаем модифицированное изображение
             return result_image
 
     # Метод для получения диагностической информации
@@ -128,22 +120,6 @@ def calculate_optimal_sample_per_pixel(num_frames, sample_rate, screen_width, mi
     return result
 
 
-def audio_to_qimage_with_mipmaps(audio_path, sample_per_pixel):
-    """
-    Создает QImage с поддержкой mipmaps из аудиофайла.
-    Каждый уровень mipmap содержит предварительно рассчитанные min/max значения.
-    """
-    from audio_processing import audio_to_qimage  # Используем существующую функцию как базу
-    
-    # Получаем базовый образ уровня 0
-    base_image = audio_to_qimage(audio_path, sample_per_pixel)
-    
-    # TODO: Здесь нужно реализовать генерацию mipmaps с min/max значениями
-    # или использовать встроенный генератор mipmaps Qt/Vulkan
-    
-    return base_image
-
-
 class AudioWaveApp:
     def __init__(self):
         app = QApplication(sys.argv)
@@ -175,41 +151,56 @@ class AudioWaveApp:
         screen = app.primaryScreen()
         screen_width = screen.size().width()
         
-        # sample_per_pixel
-        sample_per_pixel = 2  # calculate_optimal_sample_per_pixel(n_frames, framerate, screen_width)
-
-        # Generate texture with mipmaps
-        wave_texture = audio_to_qimage(audio_file_path, sample_per_pixel)
-
-        # Создаем копию изображения, чтобы избежать проблем с владением памятью
-        wave_texture_copy = QImage(wave_texture)
+        # init sample_per_pixel
+        sample_per_pixel = 1
         
-        # Устанавливаем копию изображения в провайдер
-        self.wave_provider.set_image(wave_texture_copy)
+        # create 2 textures with different sample_per_pixel values
+        # fine texture
+        fine_texture = audio_to_qimage(audio_file_path, sample_per_pixel)
+        fine_texture_copy = QImage(fine_texture)
+        self.wave_provider.set_image("fine", fine_texture_copy)
         
-        texture_width, texture_height = wave_texture.width(), wave_texture.height()
-        cols_used = int(ceil(n_frames / sample_per_pixel))
-        print("Frames used:", cols_used)
-        print('File:', audio_file_path, '\nDuration:', audio_duration, '\nTexture size:', texture_width, 'x', texture_height, '\nPixels per second:', texture_width / audio_duration)
+        # coarse texture
+        coarse_sample_per_pixel = sample_per_pixel * 16
+        coarse_texture = audio_to_qimage(audio_file_path, coarse_sample_per_pixel)
+        coarse_texture_copy = QImage(coarse_texture)
+        self.wave_provider.set_image("coarse", coarse_texture_copy)
         
-        # Calculate pixelsPerSecond
-        pixels_per_second = texture_width / audio_duration if audio_duration > 0 else 0
+        # Расчеты для обеих текстур
+        fine_cols_used = int(ceil(n_frames / sample_per_pixel))
+        coarse_cols_used = int(ceil(n_frames / coarse_sample_per_pixel))
+        
+        pixels_per_second = fine_texture.width() / audio_duration if audio_duration > 0 else 0
 
         # Set context properties
         context = self.engine.rootContext()
         
-        # First, assign key properties required for calculations
+        # Передаем информацию о обеих текстурах
         context.setContextProperty("sampleRate", framerate)
-        context.setContextProperty("samplePerPixel", sample_per_pixel)
         context.setContextProperty("audioDuration", audio_duration)
-        context.setContextProperty("cols_Used", cols_used)
+        
+        # Детальная текстура
+        context.setContextProperty("fineTextureUrl", "image://wave/fine")
+        context.setContextProperty("fineSamplePerPixel", sample_per_pixel)
+        context.setContextProperty("fineColsUsed", fine_cols_used)
+        
+        # Грубая текстура
+        context.setContextProperty("coarseTextureUrl", "image://wave/coarse")
+        context.setContextProperty("coarseSamplePerPixel", coarse_sample_per_pixel)
+        context.setContextProperty("coarseColsUsed", coarse_cols_used)
+        
+        # Для обратной совместимости
+        context.setContextProperty("samplePerPixel", sample_per_pixel)
+        context.setContextProperty("cols_Used", fine_cols_used)
+        context.setContextProperty("waveTextureUrl", "image://wave/fine")
+        
+        # Другие свойства
+        context.setContextProperty("pixelsPerSecond", pixels_per_second)
         context.setContextProperty("waveColor", QColor("white"))
         context.setContextProperty("gridColor", QColor("#808080"))
-        context.setContextProperty("pixelsPerSecond", pixels_per_second)
-        # Use image:// schema to access provider
-        context.setContextProperty("waveTextureUrl", "image://wave/audio")
+        
         # Props for debugging provider
-        context.setContextProperty("showDebugImage", False)  # Включаем отладочное отображение
+        context.setContextProperty("showDebugImage", False)
         context.setContextProperty("providerID", self.wave_provider.provider_id)
         context.setContextProperty("providerCreationTime", self.wave_provider.creation_time)
 

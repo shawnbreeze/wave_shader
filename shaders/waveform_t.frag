@@ -162,7 +162,7 @@ void main()
 
     float max_deriv_x = max(max(drTop_dx, drBot_dx), max(dlTop_dx, dlBot_dx));
 
-    float dynamicSmoothing = max_deriv_x * .05;
+    float dynamicSmoothing = max_deriv_x * 999;
     float effectiveSmoothing = max(u.smoothing, max(pixelHeight * 0.5, dynamicSmoothing));
 
     float waveR = smoothstep(rBot - effectiveSmoothing, rBot, y) - smoothstep(rTop, rTop + effectiveSmoothing, y);
