@@ -90,7 +90,8 @@ void main()
     float waveR = step(rBot, y) - step(rTop, y);
     float waveL = step(lBot, y) - step(lTop, y);
 
-    if (samplesPerPixel <= 50) {
+    if (samplesPerPixel < 99999) {
+        // draw lines
         int nextColumn = column + 1;
         if (nextColumn < int(u.resolution.x)) {
             float nextFirstF = float(startTexel) + float(nextColumn) * samplesPerPixel;

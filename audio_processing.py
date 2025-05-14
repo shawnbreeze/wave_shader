@@ -35,7 +35,7 @@ def _read_wave(filepath: str):
     return samples.reshape(-1, n_ch)   # shape: (frames, channels)
 
 
-def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> QImage:
+def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> tuple[QImage, int]:
     audio = _read_wave(filepath)
 
     if audio.shape[1] < 2:
@@ -67,7 +67,6 @@ def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> QImage:
         ),
         axis=1,
     )
-
     # Arrange into a texture with a MAX_TEX_SIDE limit
     width = min(pixels, MAX_TEX_SIDE)
     height = int(np.ceil(pixels / width))
@@ -78,27 +77,26 @@ def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> QImage:
     if tex_size != pixels:  # pad up to rectangle
         line = np.vstack((line, np.zeros((tex_size - pixels, 4), np.float32)))
 
-    img_array = line.reshape(height, width, 4)  # view, no copy
-    # pprint(img_array)
-    # 1. float32 to bytes. Format_RGBA32FPx4 needs: R(float32), G(float32), B(float32), A(float32)
+    img_array = line.reshape(height, width, 4).astype(np.float16)  # view, no copy
+ 
+    # 1. float16 to bytes. Format_RGBA16FPx4 needs: R(float16), G(float16), B(float16), A(float16)
     bytes_data = img_array.tobytes()
 
     # 2. Create QImage from the byte array
-    qimg = QImage(bytes_data, width, height, width * 16, QImage.Format.Format_RGBA32FPx4_Premultiplied)
+    qimg = QImage(bytes_data, width, height, width * 8, QImage.Format.Format_RGBA16FPx4_Premultiplied)
 
     # Check if the QImage was created successfully
     if qimg.isNull():
         logging.error("ERROR: Failed to create QImage from array data! Returning fallback image.")
         # Return a fallback image
-        fallback = QImage(MAX_TEX_SIDE, MAX_TEX_SIDE, QImage.Format.Format_RGBA32FPx4_Premultiplied)
+        fallback = QImage(MAX_TEX_SIDE, MAX_TEX_SIDE, QImage.Format.Format_RGBA16FPx4_Premultiplied)
         fallback.fill(QColor(255, 0, 0))
-        return fallback
+        return fallback, 0
 
     # 4. Create a copy of the QImage
     qimg = QImage(qimg)
 
-    print(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}")
+    logging.info(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}")
     #qimg.save("w.png", "PNG", 100)  # debug save to file
-    return qimg
-
+    return qimg, pixels
 

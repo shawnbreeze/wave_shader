@@ -41,7 +41,7 @@ ApplicationWindow {
     property int spxCoarse: coarseSamplePerPixel
     property int colsUsedFine: fineColsUsed
     property int colsUsedCoarse: coarseColsUsed
-    property string activeTexture: (scaleFactor > 50) ? "Детальная" : "Грубая"
+    property string activeTexture: (scaleFactor > 70) ? "Fine" : "Coarse"
 
     function formatTime(seconds) {
         var mins = Math.floor(seconds / 60)
@@ -489,8 +489,8 @@ ApplicationWindow {
             " sec | Sample index: " + Math.floor(root.viewStartTime * root.sampleRateValue) +
             " | Texture index: " + Math.floor(root.viewStartTime * root.sampleRateValue / (root.scaleFactor > 50 ? root.spxFine : root.spxCoarse)) +
             " | Zoom: ×" + root.scaleFactor.toFixed(1) +
-            " | SPP: " + spxFine +
-            " | Текстура: " + root.activeTexture;
+            " | Base SPP: " + spxFine +
+            " | Texture: " + root.activeTexture;
             font.pixelSize: 15
         }
     }
