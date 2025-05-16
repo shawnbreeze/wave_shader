@@ -1,133 +1,132 @@
-#version 440 core
+#version 440
 
 layout(std140, binding = 0) uniform Params
 {
-    mat4  qt_Matrix;
-    float qt_Opacity;
-    vec2  resolution;
-    int   texWidth;
-    int   colsUsedFine;
-    int   colsUsedCoarse;
-    float ampScale;
-    vec4  waveColor;
-    vec4  backColor;
-    float smoothing;
-    float startTime;
-    int   sampleRate;
-    float scaleFactor;
-    int   sppFine;
-    int   sppCoarse;
+    mat4  qt_Matrix;        // matrix for the texture
+    float qt_Opacity;       // opacity
+    vec2  resolution;       // audio texture size
+    int   texWidth;         // audio texture width
+    int   colsUsedFine;     // number of columns in fine texture
+    int   colsUsedCoarse;   // number of columns in coarse texture
+    float ampScale;         // amplitude scale
+    vec4  waveColor;        // color of the wave
+    vec4  backColor;        // background color
+    float startTime;        // start time in seconds
+    int   sampleRate;       // sample rate of audio
+    float scaleFactor;      // scale factor for the texture
+    int   sppFine;          // samples per pixel for fine texture
+    int   sppCoarse;        // samples per pixel for coarse texture
+    float pxPerTexel;       // pixels per texel for fine texture switching
 } u;
 
-layout(binding = 1) uniform sampler2D sourceFine;
-layout(binding = 2) uniform sampler2D sourceCoarse;
+layout(binding = 1) uniform sampler2D sourceFine;       // fine texture
+layout(binding = 2) uniform sampler2D sourceCoarse;     // coarse texture
 
-const float baseRight = 0.75;
-const float baseLeft  = 0.25;
+const float baseRight = 0.75;               // right channel base position
+const float baseLeft  = 0.25;               // left channel base position
+const float normFactor = 2.0;               // нормализующий множитель (r-0.5)*2.0
+const float halfValue = 0.5;                // половина для нормализации
 
+// Предварительно вычисляем координату деления без модуля
 ivec2 lin2xy (int idx, int w)
 {
     return ivec2(idx % w, idx / w);
+}
+
+// Функция чтения данных из текстуры и нормализации
+vec4 getNormalizedSample(int idx, bool useFine) {
+    vec4 s = useFine 
+           ? texelFetch(sourceFine, lin2xy(idx, u.texWidth), 0)
+           : texelFetch(sourceCoarse, lin2xy(idx, u.texWidth), 0);
+    
+    // Нормализуем все компоненты за один вызов
+    return (s - halfValue) * normFactor;
 }
 
 layout(location = 0) out vec4 fragColor;
 
 void main()
 {
-    // Выбираем текстуру и параметры в зависимости от scaleFactor
-    bool useFineTexture = (u.scaleFactor > 70.0);
-    
+    // dynamic fine texture selection
+    float pixelsPerCoarseTexel = (u.resolution.x * u.scaleFactor) / float(u.colsUsedCoarse);
+    bool useFineTexture = (pixelsPerCoarseTexel > u.pxPerTexel);
     int colsUsed = useFineTexture ? u.colsUsedFine : u.colsUsedCoarse;
     int samplePerPixel = useFineTexture ? u.sppFine : u.sppCoarse;
     
     int column = int(gl_FragCoord.x);
+    float y = gl_FragCoord.y / u.resolution.y;
 
-    float samplesPerPixel = float(colsUsed) /
-                            (u.resolution.x * max(u.scaleFactor, 1e-6));
+    float samplesPerPixel = float(colsUsed) / (u.resolution.x * max(u.scaleFactor, 1e-6));
+    bool isHighZoom = (samplesPerPixel < 50.0);
 
-    int startTexel = int(u.startTime * float(u.sampleRate) /
-                         float(samplePerPixel));
-
-    float firstF = float(startTexel) + float(column    ) * samplesPerPixel;
-    float lastF  = float(startTexel) + float(column + 1) * samplesPerPixel;
+    int startTexel = int(u.startTime * float(u.sampleRate) / float(samplePerPixel));
+    float firstF = float(startTexel) + float(column) * samplesPerPixel;
+    float lastF  = firstF + samplesPerPixel;
 
     int firstT = int(floor(firstF));
     int lastT  = int(floor(lastF));
+    
     if (lastT <= firstT)
         lastT = firstT + 1;
     if (firstT >= colsUsed) {
         discard;
     }
-    lastT = clamp(lastT, firstT + 1, colsUsed);
+    lastT = min(lastT, colsUsed);
 
-    float rMin=  1e20, rMax=-1e20,
-          lMin=  1e20, lMax=-1e20;
+    // Инициализация минимальных и максимальных значений
+    vec4 minMax = vec4(1e20, -1e20, 1e20, -1e20); // rMin, rMax, lMin, lMax
 
-    // Выбираем текстуру для чтения данных
-    for (int i = firstT ; i < lastT ; ++i) {
-        vec4 s;
-        if (useFineTexture) {
-            s = texelFetch(sourceFine, lin2xy(i,u.texWidth), 0);
-        } else {
-            s = texelFetch(sourceCoarse, lin2xy(i,u.texWidth), 0);
-        }
-        rMin = min(rMin, s.r);   rMax = max(rMax, s.g);
-        lMin = min(lMin, s.b);   lMax = max(lMax, s.a);
+    // Сбор данных диапазона без ветвления внутри цикла
+    for (int i = firstT; i < lastT; ++i) {
+        vec4 norm = getNormalizedSample(i, useFineTexture);
+        
+        // Обновляем минимальные и максимальные значения
+        minMax.x = min(minMax.x, norm.x);  // rMin
+        minMax.y = max(minMax.y, norm.y);  // rMax
+        minMax.z = min(minMax.z, norm.z);  // lMin
+        minMax.w = max(minMax.w, norm.w);  // lMax
     }
 
-    rMin = (rMin - 0.5) * 2.0;
-    rMax = (rMax - 0.5) * 2.0;
-    lMin = (lMin - 0.5) * 2.0;
-    lMax = (lMax - 0.5) * 2.0;
-
-    float y = gl_FragCoord.y / u.resolution.y;
-
-    float rBot  = baseRight + rMin * u.ampScale;
-    float rTop = baseRight + rMax * u.ampScale;
-    float lBot  = baseLeft  + lMin * u.ampScale;
-    float lTop = baseLeft  + lMax * u.ampScale;
+    // Вычисление границ волн с учетом масштаба
+    float rBot = baseRight + minMax.x * u.ampScale;
+    float rTop = baseRight + minMax.y * u.ampScale;
+    float lBot = baseLeft  + minMax.z * u.ampScale;
+    float lTop = baseLeft  + minMax.w * u.ampScale;
 
     float waveR = step(rBot, y) - step(rTop, y);
     float waveL = step(lBot, y) - step(lTop, y);
 
-    if (samplesPerPixel < 99999) {
-        // draw lines
+    // Оптимизированная отрисовка линий при высоком зуме
+    if (isHighZoom) {
         int nextColumn = column + 1;
         if (nextColumn < int(u.resolution.x)) {
             float nextFirstF = float(startTexel) + float(nextColumn) * samplesPerPixel;
             int nextFirstT = int(floor(nextFirstF));
+            
             if (nextFirstT < colsUsed) {
-                vec4 nextS;
-                if (useFineTexture) {
-                    nextS = texelFetch(sourceFine, lin2xy(nextFirstT, u.texWidth), 0);
-                } else {
-                    nextS = texelFetch(sourceCoarse, lin2xy(nextFirstT, u.texWidth), 0);
-                }
-                float nextRMin = (nextS.r - 0.5) * 2.0;
-                float nextRMax = (nextS.g - 0.5) * 2.0;
-                float nextLMin = (nextS.b - 0.5) * 2.0;
-                float nextLMax = (nextS.a - 0.5) * 2.0;
-                float nextRBot = baseRight + nextRMin * u.ampScale;
-                float nextRTop = baseRight + nextRMax * u.ampScale;
-                float nextLBot = baseLeft  + nextLMin * u.ampScale;
-                float nextLTop = baseLeft  + nextLMax * u.ampScale;
+                // Получаем данные следующего столбца за один вызов
+                vec4 nextNorm = getNormalizedSample(nextFirstT, useFineTexture);
+                
+                // Вычисляем границы для следующего столбца
+                float nextRBot = baseRight + nextNorm.x * u.ampScale;
+                float nextRTop = baseRight + nextNorm.y * u.ampScale;
+                float nextLBot = baseLeft  + nextNorm.z * u.ampScale;
+                float nextLTop = baseLeft  + nextNorm.w * u.ampScale;
 
-                float minR = min(rBot, nextRBot);
-                float maxR = max(rBot, nextRBot);
-                if (y >= minR && y <= maxR) waveR = 1.0;
-                float minRT = min(rTop, nextRTop);
-                float maxRT = max(rTop, nextRTop);
-                if (y >= minRT && y <= maxRT) waveR = 1.0;
-                float minL = min(lBot, nextLBot);
-                float maxL = max(lBot, nextLBot);
-                if (y >= minL && y <= maxL) waveL = 1.0;
-                float minLT = min(lTop, nextLTop);
-                float maxLT = max(lTop, nextLTop);
-                if (y >= minLT && y <= maxLT) waveL = 1.0;
+                // Проверка для правого канала (нижняя и верхняя границы)
+                if ((y >= min(rBot, nextRBot) && y <= max(rBot, nextRBot)) || 
+                    (y >= min(rTop, nextRTop) && y <= max(rTop, nextRTop))) {
+                    waveR = 1.0;
+                }
+                
+                // Проверка для левого канала (нижняя и верхняя границы)
+                if ((y >= min(lBot, nextLBot) && y <= max(lBot, nextLBot)) || 
+                    (y >= min(lTop, nextLTop) && y <= max(lTop, nextLTop))) {
+                    waveL = 1.0;
+                }
             }
         }
     }
 
-    fragColor = mix(u.backColor, u.waveColor,
-                    clamp(waveR + waveL, 0.0, 1.0));
+    fragColor = mix(u.backColor, u.waveColor, clamp(waveR + waveL, 0.0, 1.0));
 }

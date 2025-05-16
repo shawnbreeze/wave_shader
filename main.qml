@@ -1,21 +1,19 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
-import QtQuick.Controls.Fusion // Add import for base style customization
+import QtQuick.Controls.Fusion
 
 // Set global style for the application
 ApplicationWindow {
     id: root
     width: 1200; height: 720; visible: true
     property int colsUsed: cols_Used
-    // Fix audioDuration definition to avoid self-reference
-    property real audioLength: audioDuration  // Get value from Python context
+    property real audioLength: audioDuration
     
     color: "#121212"  // Set dark background for the window
 
-    // Get values from Python context, avoiding self-references
     property int spx: samplePerPixel
-    property int sampleRateValue: sampleRate // Renamed to avoid self-reference
+    property int sampleRateValue: sampleRate
     property real viewStartTime: 0.0  // Current time in sec calculated in QML
 
     // Properties for navigation and zooming
@@ -36,12 +34,18 @@ ApplicationWindow {
     property real anchorMouseX: 0.0       // Normalized X-coordinate of the mouse (0-1) at zoom start
     property real anchorCursorPos: 0.0    // Audio position to remain under the cursor
 
-    // Добавляем свойства для обеих текстур
+    // --- PROPERTIES FOR TEXTURE SELECTION ---
     property int spxFine: fineSamplePerPixel
     property int spxCoarse: coarseSamplePerPixel
     property int colsUsedFine: fineColsUsed
     property int colsUsedCoarse: coarseColsUsed
-    property string activeTexture: (scaleFactor > 70) ? "Fine" : "Coarse"
+    readonly property real  pixelLimitPerTexel  : fineTextureSwitchThreshold // Threshold texel/px for texture switching
+    readonly property real  pixelsPerCoarseTexel: (width * Screen.devicePixelRatio * scaleFactor) / colsUsedCoarse
+    readonly property bool  useFineTexture : pixelsPerCoarseTexel > pixelLimitPerTexel
+    readonly property string activeTexture : useFineTexture ? "Fine" : "Coarse"
+
+    // antialiasing samples
+    readonly property int antialiasingSamples: antialiasingSamples
 
     function formatTime(seconds) {
         var mins = Math.floor(seconds / 60)
@@ -95,17 +99,17 @@ ApplicationWindow {
 
         Row {
             anchors.fill: parent
-            anchors.leftMargin: 5 // Added left margin
-            anchors.rightMargin: 5 // Added right margin
-            spacing: 5 // Adjusted spacing
+            anchors.leftMargin: 4
+            anchors.rightMargin: 4
+            spacing: 4
 
             // Scroll Left Button
             Button {
                 id: scrollLeftButton
-                width: 27 // Adjusted width (40 / 1.5)
+                width: 27
                 height: parent.height
-                text: "◀" // Changed icon
-                font.pixelSize: 18 // Adjusted font size for new icon and width
+                text: "◀"
+                font.pixelSize: 18
                 onClicked: {
                     if (scrollAnimation.running) {
                         scrollAnimation.stop()
@@ -165,8 +169,7 @@ ApplicationWindow {
                         property int       colsUsed: root.colsUsed
                         property vector2d  resolution: Qt.vector2d(width, height)
                         property int       texWidth: waveImg.width
-                        property real      ampScale: 0.2  // ~100% height without cropping
-                        property real      smoothing: 0
+                        property real      ampScale: 0.2
                         property vector4d  waveColor: Qt.vector4d(0.28,0.85,0.59,1.0) // black waveform originally
                         property vector4d  backColor: Qt.vector4d(0, 0, 0, 0)
                         property real      startTime: 0.0
@@ -179,6 +182,7 @@ ApplicationWindow {
                         property int sppFine: root.spxFine
                         property int sppCoarse: root.spxCoarse
                         property real scaleFactor: 1.0
+                        property real pxPerTexel: root.pixelLimitPerTexel
                         fragmentShader: "shaders/new_wave.frag.qsb"
                         vertexShader:   "shaders/new_wave.vert.qsb"
                     }
@@ -204,10 +208,8 @@ ApplicationWindow {
                         implicitWidth: 200
                         implicitHeight: 20
                         radius: 3
-                        // Base handle color (opaque)
-                        color: "#A0A0A0" 
-                        // Initial opacity
-                        opacity: navigationScrollBar.hovered ? 0.6 : 0.3
+                        color: "#A0A0A0" // Base handle color (opaque)
+                        opacity: navigationScrollBar.hovered ? 0.6 : 0.3 // Initial opacity
 
                         // Animation for opacity property
                         Behavior on opacity {
@@ -217,10 +219,8 @@ ApplicationWindow {
                             }
                         }
                         
-                        border.color: "black" // Keep black border if needed
+                        border.color: "black" // Keep black border
                         border.width: 1
-
-                        // No text inside the handle
                     }
 
                     /* --- internal helper properties --- */
@@ -301,7 +301,6 @@ ApplicationWindow {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
-            // Removed element for current position display (timeDisplay)
         }
     }
 
@@ -335,18 +334,18 @@ ApplicationWindow {
         easing.type: Easing.OutCubic
     }
 
-    // Первый Image элемент
+    // first Image element for the waveform
     Image {
         id: waveImg
-        source: waveTextureUrl  // URL от провайдера
+        source: waveTextureUrl
         visible: false
         layer.smooth: false
         smooth: false
         mipmap: false
-        cache: true  // Отключаем кэширование, чтобы принудительно перезагружать
-        asynchronous: true // Асинхронная загрузка для больших изображений
+        cache: true
+        asynchronous: true
         
-        // Обработка ошибок загрузки
+        // handler for image loading status
         onStatusChanged: {
             if (status === Image.Ready) {
                 console.log("Image loaded successfully: " + width + "x" + height)
@@ -358,7 +357,7 @@ ApplicationWindow {
         }
     }
 
-    // Загружаем обе текстуры
+    // load fine and coarse textures
     Image {
         id: fineTexture
         source: fineTextureUrl
@@ -368,14 +367,6 @@ ApplicationWindow {
         mipmap: false
         cache: true
         asynchronous: true
-        
-        onStatusChanged: {
-            if (status === Image.Ready) {
-                console.log("Fine texture loaded: " + width + "x" + height)
-            } else if (status === Image.Error) {
-                console.error("Error loading fine texture")
-            }
-        }
     }
     
     Image {
@@ -399,27 +390,24 @@ ApplicationWindow {
 
     ShaderEffect {
         id: waveShader
-        antialiasing: true
+//        antialiasing: true
         layer.enabled: true
-        layer.samples: 8
-        smooth: true
+        layer.samples: root.antialiasingSamples
+//        smooth: true
         anchors.top: scaleBarBackground.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 5
+        anchors.margins: 4
         property variant source: waveImg
         property int colsUsed: root.colsUsed
         property vector2d resolution: Qt.vector2d(width, height)
         property int texWidth: waveImg.width
         property var ampScale: 0.23
-        property real smoothing: 1.5
         property vector4d waveColor: Qt.vector4d(0.18,0.85,0.59,1.0)
         property vector4d backColor: Qt.vector4d(0.0,0.0,0.0,1.0)
         property real startTime: root.viewStartTime
         property int sampleRate: root.sampleRateValue
-        // Удаляем дублиру��щееся свойство, оно определено ниже
-        // property real scaleFactor: root.scaleFactor
         property int samplePerPixel: root.spx
         property variant sourceFine: fineTexture
         property variant sourceCoarse: coarseTexture
@@ -428,8 +416,7 @@ ApplicationWindow {
         property int sppFine: root.spxFine
         property int sppCoarse: root.spxCoarse
         property real scaleFactor: root.scaleFactor
-//        fragmentShader: "shaders/waveform_t.frag.qsb"
-//        vertexShader: "shaders/waveform_t.vert.qsb"
+        property real pxPerTexel: root.pixelLimitPerTexelо
         fragmentShader: "shaders/new_wave.frag.qsb"
         vertexShader:   "shaders/new_wave.vert.qsb"
         
@@ -495,7 +482,7 @@ ApplicationWindow {
         }
     }
 
-    // Добавляем отладочное отображение загруженного изображения
+    // debug image provider
     Rectangle {
         id: debugImageContainer
         anchors.right: parent.right
@@ -520,7 +507,7 @@ ApplicationWindow {
             anchors.top: debugTitle.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.margins: 5
+            anchors.margins: 4
             
             Text {
                 width: parent.width
@@ -554,7 +541,7 @@ ApplicationWindow {
             }
         }
         
-        // Второй Image элемент с тем же URL
+        // debug image
         Image {
             id: debugImage
             source: (root.scaleFactor > 50) ? fineTextureUrl : coarseTextureUrl
@@ -569,7 +556,7 @@ ApplicationWindow {
             Text {
                 anchors.bottom: parent.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Зеленая метка в верхнем\nправом углу = ImageProvider"
+                text: "ImageProvider"
                 color: "lightgreen"
                 font.pixelSize: 10
                 horizontalAlignment: Text.AlignHCenter

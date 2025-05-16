@@ -1,5 +1,4 @@
 @echo off
-echo Compiling shaders...
 
 :: Folder with QSB compiler
 set QSB="c:\Qt\6.9\6.9.0\mingw_64\bin\qsb.exe"
@@ -23,5 +22,4 @@ for %%f in ("%SHADERS_DIR%\*.frag" "%SHADERS_DIR%\*.vert") do (
     %QSB% --glsl "440" --hlsl 50 --msl 22 -o "%%f.qsb" "%%f"
 )
 
-echo Compilation complete!
 exit /b 0

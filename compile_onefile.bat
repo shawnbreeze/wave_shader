@@ -5,7 +5,7 @@ python -m nuitka --mingw64 ^
 --include-data-files=shaders/new_wave.vert.qsb=shaders/new_wave.vert.qsb ^
 --include-qt-plugins=qml ^
 --standalone ^
+--onefile ^
 --windows-console-mode=attach ^
---enable-plugin=anti-bloat ^
---lto=no ^
+--jobs=12 ^
 test.py

@@ -9,7 +9,7 @@ MAX_TEX_SIDE = 8192           # maximum texture width/height
 
 
 def _read_wave(filepath: str):
-    """Read wav into a numpy array of float32 in the range [-1, 1]."""
+    """Read wav into a numpy array of float16 in the range [-1, 1]."""
     with wave.open(filepath, 'rb') as wav:
         n_ch, samp_w, n_frames = wav.getnchannels(), wav.getsampwidth(), wav.getnframes()
         raw = wav.readframes(n_frames)
@@ -24,7 +24,7 @@ def _read_wave(filepath: str):
                    (b[:, 2].astype(np.int32) << 16))
         samples = np.where(samples & 0x800000, samples - 0x1000000, samples)
     elif samp_w == 4:
-        samples = np.frombuffer(raw, dtype=np.int32)
+        samples = np.frombuffer(raw, dtype=np.int16)
     else:
         raise ValueError(f'Unsupported sample width: {samp_w} bytes')
 
@@ -90,13 +90,13 @@ def audio_to_qimage(filepath: str, samples_per_pixel: int = 1) -> tuple[QImage, 
         logging.error("ERROR: Failed to create QImage from array data! Returning fallback image.")
         # Return a fallback image
         fallback = QImage(MAX_TEX_SIDE, MAX_TEX_SIDE, QImage.Format.Format_RGBA16FPx4_Premultiplied)
-        fallback.fill(QColor(255, 0, 0))
+        fallback.fill(QColor(154, 100, 154, 100))
         return fallback, 0
 
     # 4. Create a copy of the QImage
     qimg = QImage(qimg)
 
-    logging.info(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}")
-    #qimg.save("w.png", "PNG", 100)  # debug save to file
+    logging.debug(f"Created QImage: {qimg.width()}x{qimg.height()}, format: {qimg.format()}, isNull: {qimg.isNull()}")
+    # qimg.save("w.png", "PNG", 100)  # debug save to file
     return qimg, pixels
 
