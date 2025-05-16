@@ -33,8 +33,7 @@ logger.addHandler(console_handler)
 
 # function to handle QML messages
 def qt_message_handler(mode, context, message):
-    # Получаем имя файла и номер строки из контекста, если возможно
-    # context.file, context.line, context.function
+    # get context.file, context.line, context.function if available
     log_message = f"[QML] {message}"
     if context.file:
         log_message = f"[QML] {os.path.basename(context.file)}:{context.line} - {message}"
@@ -49,7 +48,7 @@ def qt_message_handler(mode, context, message):
         logger.error(log_message)
     elif mode == QtMsgType.QtFatalMsg:
         logger.critical(log_message)
-        sys.exit(-1) # Фатальные ошибки обычно требуют завершения
+        sys.exit(-1)
 
 
 class WaveImageProvider(QQuickImageProvider):
@@ -125,7 +124,6 @@ class AudioWaveApp:
         self.engine.addImageProvider("wave", self.wave_provider)
 
         audio_file_path = "Antonio Vivaldi - Allegro - Spring.wav"
-        # audio_file_path = "long.wav"
 
         # Retrieve audio file info before creating texture
         with wave.open(audio_file_path, 'rb') as wav_file:
