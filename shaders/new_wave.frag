@@ -27,19 +27,19 @@ const float baseLeft  = 0.25;               // left channel base position
 const float normFactor = 2.0;               // нормализующий множитель (r-0.5)*2.0
 const float halfValue = 0.5;                // половина для нормализации
 
-// Предварительно вычисляем координату деления без модуля
+// pre-calculate the division coordinate without modulus
 ivec2 lin2xy (int idx, int w)
 {
     return ivec2(idx % w, idx / w);
 }
 
-// Функция чтения данных из текстуры и нормализации
+// Function for reading data from texture and normalization
 vec4 getNormalizedSample(int idx, bool useFine) {
     vec4 s = useFine 
            ? texelFetch(sourceFine, lin2xy(idx, u.texWidth), 0)
            : texelFetch(sourceCoarse, lin2xy(idx, u.texWidth), 0);
     
-    // Нормализуем все компоненты за один вызов
+    // Normalize all components in one call
     return (s - halfValue) * normFactor;
 }
 
@@ -73,21 +73,21 @@ void main()
     }
     lastT = min(lastT, colsUsed);
 
-    // Инициализация минимальных и максимальных значений
+    // Initialization of minimum and maximum values
     vec4 minMax = vec4(1e20, -1e20, 1e20, -1e20); // rMin, rMax, lMin, lMax
 
-    // Сбор данных диапазона без ветвления внутри цикла
+    // Collecting range data without branching within a loop
     for (int i = firstT; i < lastT; ++i) {
         vec4 norm = getNormalizedSample(i, useFineTexture);
         
-        // Обновляем минимальные и максимальные значения
+        // Updating the minimum and maximum values
         minMax.x = min(minMax.x, norm.x);  // rMin
         minMax.y = max(minMax.y, norm.y);  // rMax
         minMax.z = min(minMax.z, norm.z);  // lMin
         minMax.w = max(minMax.w, norm.w);  // lMax
     }
 
-    // Вычисление границ волн с учетом масштаба
+    // Computation of wave boundaries taking into account the scale
     float rBot = baseRight + minMax.x * u.ampScale;
     float rTop = baseRight + minMax.y * u.ampScale;
     float lBot = baseLeft  + minMax.z * u.ampScale;
@@ -96,7 +96,7 @@ void main()
     float waveR = step(rBot, y) - step(rTop, y);
     float waveL = step(lBot, y) - step(lTop, y);
 
-    // Оптимизированная отрисовка линий при высоком зуме
+    // Optimized line drawing at high zoom level
     if (isHighZoom) {
         int nextColumn = column + 1;
         if (nextColumn < int(u.resolution.x)) {
@@ -104,22 +104,22 @@ void main()
             int nextFirstT = int(floor(nextFirstF));
             
             if (nextFirstT < colsUsed) {
-                // Получаем данные следующего столбца за один вызов
+                // Get the data of the next column in one call
                 vec4 nextNorm = getNormalizedSample(nextFirstT, useFineTexture);
                 
-                // Вычисляем границы для следующего столбца
+                // Calculate the bounds for the next column
                 float nextRBot = baseRight + nextNorm.x * u.ampScale;
                 float nextRTop = baseRight + nextNorm.y * u.ampScale;
                 float nextLBot = baseLeft  + nextNorm.z * u.ampScale;
                 float nextLTop = baseLeft  + nextNorm.w * u.ampScale;
 
-                // Проверка для правого канала (нижняя и верхняя границы)
+                // Check for the right channel (lower and upper limits)
                 if ((y >= min(rBot, nextRBot) && y <= max(rBot, nextRBot)) || 
                     (y >= min(rTop, nextRTop) && y <= max(rTop, nextRTop))) {
                     waveR = 1.0;
                 }
                 
-                // Проверка для левого канала (нижняя и верхняя границы)
+                // Check for the left channel (lower and upper limits)
                 if ((y >= min(lBot, nextLBot) && y <= max(lBot, nextLBot)) || 
                     (y >= min(lTop, nextLTop) && y <= max(lTop, nextLTop))) {
                     waveL = 1.0;
