@@ -1,6 +1,6 @@
 # Wave Shader Audio Visualizer
 
-<video src='preview.mp4' width=720/>
+https://github.com/user-attachments/assets/eb6076f7-a0da-484d-a424-03a275319928
 
 ## Overview
 
