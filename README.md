@@ -1,4 +1,4 @@
-# Wave Shader Audio Visualizer
+# Audio Wave GLSL Shader Visualizer
 
 https://github.com/user-attachments/assets/eb6076f7-a0da-484d-a424-03a275319928
 
