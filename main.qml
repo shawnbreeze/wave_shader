@@ -9,6 +9,7 @@ ApplicationWindow {
     width: 1200; height: 720; visible: true
     property int colsUsed: cols_Used
     property real audioLength: audioDuration
+    title: "Waveform Viewer"
     
     color: "#121212"  // Set dark background for the window
 

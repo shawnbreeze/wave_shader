@@ -132,9 +132,6 @@ class AudioWaveApp:
             channels = wav_file.getnchannels()
             audio_duration = n_frames / float(framerate)
 
-        # init sample_per_pixel (SPP),
-        # 1 for maximum detailed waveform and max ZOOM,
-        # lower values need more RAM and GPU,
         # 0 for automatic, optimal = 2 TODO: automatic spp setting based on audio n_frames and MAX_TEX_SIDE, returns max value that fits in MAX_TEX_SIDE*MAX_TEX_SIDE size texture
         base_sample_per_pixel = base_spp
 
@@ -216,9 +213,16 @@ if __name__ == "__main__":
     import sys
     argv = sys.argv
 
-    # Set default values
+    # coarse texture SPP multiplier
     COARSE_MULTIPLIER = 1
+
+    # init antialiasing samples (SMAA)
     ANTIALIASING_SAMPLES = 0
+
+    # init sample_per_pixel (SPP),
+    # 1 for maximum detailed waveform and max ZOOM,
+    # lower values need more RAM and GPU
+    # optimal value = 2 for RTX 2060 level GPU's (120 FPS)
     BASE_SPP = 2
 
     # set Qt messages handler
