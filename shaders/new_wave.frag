@@ -35,10 +35,10 @@ ivec2 lin2xy (int idx, int w)
 
 // Function for reading data from texture and normalization
 vec4 getNormalizedSample(int idx, bool useFine) {
-    vec4 s = useFine 
+    vec4 s = useFine
            ? texelFetch(sourceFine, lin2xy(idx, u.texWidth), 0)
            : texelFetch(sourceCoarse, lin2xy(idx, u.texWidth), 0);
-    
+
     // Normalize all components in one call
     return (s - halfValue) * normFactor;
 }
@@ -52,7 +52,7 @@ void main()
     bool useFineTexture = (pixelsPerCoarseTexel > u.pxPerTexel);
     int colsUsed = useFineTexture ? u.colsUsedFine : u.colsUsedCoarse;
     int samplePerPixel = useFineTexture ? u.sppFine : u.sppCoarse;
-    
+
     int column = int(gl_FragCoord.x);
     float y = gl_FragCoord.y / u.resolution.y;
 
@@ -79,7 +79,7 @@ void main()
     // Collecting range data without branching within a loop
     for (int i = firstT; i < lastT; ++i) {
         vec4 norm = getNormalizedSample(i, useFineTexture);
-        
+
         // Updating the minimum and maximum values
         minMax.x = min(minMax.x, norm.x);  // rMin
         minMax.y = max(minMax.y, norm.y);  // rMax
@@ -106,7 +106,7 @@ void main()
             if (nextFirstT < colsUsed) {
                 // Get the data of the next column in one call
                 vec4 nextNorm = getNormalizedSample(nextFirstT, useFineTexture);
-                
+
                 // Calculate the bounds for the next column
                 float nextRBot = baseRight + nextNorm.x * u.ampScale;
                 float nextRTop = baseRight + nextNorm.y * u.ampScale;

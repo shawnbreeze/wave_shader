@@ -209,7 +209,7 @@ ApplicationWindow {
                         implicitWidth: 200
                         implicitHeight: 20
                         radius: 3
-                        color: "#A0A0A0" // Base handle color (opaque)
+                        color: "#6f05ff" // Base handle color (opaque)
                         opacity: navigationScrollBar.hovered ? 0.6 : 0.3 // Initial opacity
 
                         // Animation for opacity property
@@ -417,7 +417,7 @@ ApplicationWindow {
         property int sppFine: root.spxFine
         property int sppCoarse: root.spxCoarse
         property real scaleFactor: root.scaleFactor
-        property real pxPerTexel: root.pixelLimitPerTexelо
+        property real pxPerTexel: root.pixelLimitPerTexel
         fragmentShader: "shaders/new_wave.frag.qsb"
         vertexShader:   "shaders/new_wave.vert.qsb"
         

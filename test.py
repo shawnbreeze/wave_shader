@@ -177,7 +177,7 @@ class AudioWaveApp:
         context.setContextProperty("coarseTextureUrl", "image://wave/coarse")
         context.setContextProperty("coarseSamplePerPixel", coarse_sample_per_pixel)
         context.setContextProperty("coarseColsUsed", coarse_cols_used)
-        
+
         # more properties
         context.setContextProperty("fineTextureSwitchThreshold", 1.0)
         context.setContextProperty("samplePerPixel", base_sample_per_pixel)
@@ -276,4 +276,8 @@ if __name__ == "__main__":
         antialiasing_samples=ANTIALIASING_SAMPLES,
         base_spp=BASE_SPP
     )
+
+
+
+
 
