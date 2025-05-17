@@ -1,10 +1,10 @@
-# Wave Shader Audio Visualizer
+# Audio Wave GLSL Shader Visualizer
 
-<video src='preview.mp4' width=720/>
+https://github.com/user-attachments/assets/eb6076f7-a0da-484d-a424-03a275319928
 
 ## Overview
 
-Wave Shader Audio Visualizer is a high-performance audio waveform visualization tool built with Python, Qt (PySide6), and GPU-accelerated shaders. It loads stereo `.wav` files, processes audio data into GPU textures, and renders interactive, zoomable waveforms using custom GLSL shaders.
+Wave Shader Audio Visualizer is a high-performance audio waveform visualization tool built with Python, Qt (PySide6), and GPU-accelerated shaders. It loads stereo `.wav` files, processes audio data into GPU textures, and renders interactive, zoomable waveforms using custom GLSL shaders. Can be used in audio apps development.
 
 ## Features
 
